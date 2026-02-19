@@ -1,0 +1,298 @@
+package page;
+
+
+Book.java
+public class Book {
+    private int id;
+    private String title;
+    private String author;
+    private int year;
+
+    // Getters and setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getAuthor() { return author; }
+    public void setAuthor(String author) { this.author = author; }
+    public int getYear() { return year; }
+    public void setYear(int year) { this.year = year; }
+}
+
+
+BookDAO
+package page;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class BookDAO {
+    public static void addBook(Book book) {
+        String query = "INSERT INTO Books (title, author, year) VALUES (?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, book.getTitle());
+            stmt.setString(2, book.getAuthor());
+            stmt.setInt(3, book.getYear());
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static List<Book> getAllBooks() {
+        List<Book> books = new ArrayList<>();
+        String query = "SELECT * FROM Books";
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                Book book = new Book();
+                book.setId(rs.getInt("id"));
+                book.setTitle(rs.getString("title"));
+                book.setAuthor(rs.getString("author"));
+                book.setYear(rs.getInt("year"));
+                books.add(book);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return books;
+    }
+
+    public static boolean updateBook(Book book) {
+        String query = "UPDATE Books SET title = ?, author = ?, year = ? WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, book.getTitle());
+            stmt.setString(2, book.getAuthor());
+            stmt.setInt(3, book.getYear());
+            stmt.setInt(4, book.getId());
+
+            int rowsAffected = stmt.executeUpdate(); // Get number of affected rows
+            return rowsAffected > 0; // If at least one row is affected, return true
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+
+    public static boolean deleteBook(int bookId) {
+        String query = "DELETE FROM Books WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, bookId);
+
+            // Execute the update and check the number of rows affected
+            int rowsAffected = stmt.executeUpdate();
+            
+            // If rowsAffected > 0, it means the deletion was successful
+            if (rowsAffected > 0) {
+                return true;
+            } else {
+                return false; // No rows affected, meaning no book with the given ID was found
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false; // Return false if there's an exception (e.g., SQL error)
+        }
+    }
+}
+
+
+DatabaseConnection.java
+package page;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseConnection {
+    public static Connection getConnection() throws SQLException {
+        try {
+            String url = "jdbc:mysql://localhost:3306/LibraryDB";
+            String username = "root"; // Your MySQL username
+            String password = "Preeti@20042004"; // Your MySQL password
+            return DriverManager.getConnection(url, username, password);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new SQLException("Connection failed.");
+        }
+    }
+}
+
+
+
+LibraryFrame.java
+package page;
+import java.awt.EventQueue;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.List;
+
+public class LibraryFrame extends JFrame {
+    private JTextField titleField, authorField, yearField;
+    private JButton addButton, viewButton, updateButton, deleteButton;
+    private JTextArea displayArea;
+
+    public LibraryFrame() {
+        setTitle("Library Management System");
+        setSize(500, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new FlowLayout());
+
+        JLabel titleLabel = new JLabel("Title:");
+        titleField = new JTextField(20);
+        JLabel authorLabel = new JLabel("Author:");
+        authorField = new JTextField(20);
+        JLabel yearLabel = new JLabel("Year:");
+        yearField = new JTextField(5);
+
+        addButton = new JButton("Add Book");
+        viewButton = new JButton("View Books");
+        updateButton = new JButton("Update Book");
+        deleteButton = new JButton("Delete Book");
+
+        displayArea = new JTextArea(10, 40);
+        displayArea.setEditable(false);
+
+        add(titleLabel);
+        add(titleField);
+        add(authorLabel);
+        add(authorField);
+        add(yearLabel);
+        add(yearField);
+        add(addButton);
+        add(viewButton);
+        add(updateButton);
+        add(deleteButton);
+        add(new JScrollPane(displayArea));
+
+        // Add button actions
+        addButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String title = titleField.getText();
+                String author = authorField.getText();
+                int year = Integer.parseInt(yearField.getText());
+                Book book = new Book();
+                book.setTitle(title);
+                book.setAuthor(author);
+                book.setYear(year);
+                BookDAO.addBook(book);
+                clearFields();
+            }
+        });
+
+        viewButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayArea.setText("");
+                List<Book> books = BookDAO.getAllBooks();
+                for (Book book : books) {
+                    displayArea.append("ID: " + book.getId() + " Title: " + book.getTitle() + " Author: " + book.getAuthor() + " Year: " + book.getYear() + "\n");
+                }
+            }
+        });
+
+        updateButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Validate input fields
+                String title = titleField.getText();
+                String author = authorField.getText();
+                String yearText = yearField.getText();
+
+                // Check if any field is empty
+                if (title.isEmpty() || author.isEmpty() || yearText.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "All fields must be filled.");
+                    return;
+                }
+
+                // Validate year as a number
+                int year;
+                try {
+                    year = Integer.parseInt(yearText);
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(null, "Year must be a valid number.");
+                    return;
+                }
+
+                // Get the ID from the user
+                String idText = JOptionPane.showInputDialog("Enter Book ID to update:");
+                int id;
+                try {
+                    id = Integer.parseInt(idText);
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(null, "Please enter a valid numeric ID.");
+                    return;
+                }
+
+                // Create the Book object and set its values
+                Book book = new Book();
+                book.setId(id);
+                book.setTitle(title);
+                book.setAuthor(author);
+                book.setYear(year);
+
+                // Update the book in the database
+                boolean success = BookDAO.updateBook(book);
+                
+                if (success) {
+                    JOptionPane.showMessageDialog(null, "Book updated successfully.");
+                    clearFields(); // Clear input fields after update
+                    // Refresh the list of books in the display area
+                } else {
+                    JOptionPane.showMessageDialog(null, "Update failed. No book found with the specified ID.");
+                }
+            }
+        });
+
+        deleteButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    // Prompt user to enter book ID
+                    int id = Integer.parseInt(JOptionPane.showInputDialog("Enter Book ID to delete:"));
+
+                    // Call the delete method (you might want to check if the book exists)
+                    boolean deletebook = BookDAO.deleteBook(id);
+
+                    // If the book was deleted successfully, show a success message
+                    if (deletebook) {
+                        JOptionPane.showMessageDialog(null, "Book deleted successfully!");
+                    } else {
+                        // If the book doesn't exist or can't be deleted, show an error message
+                        JOptionPane.showMessageDialog(null, "Invalid Book ID. Book not found.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } 
+                catch (NumberFormatException ex) {
+                    // If user enters a non-numeric ID, show an error message
+                    JOptionPane.showMessageDialog(null, "Please enter a valid numeric ID.", "Invalid Input", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+    }
+
+    private void clearFields() {
+        titleField.setText("");
+        authorField.setText("");
+        yearField.setText("");
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new LibraryFrame().setVisible(true);
+        });
+    }
+}
